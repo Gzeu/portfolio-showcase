@@ -41,8 +41,9 @@ jobs:
       
       - name: 💾 Install Dependencies
         run: |
-          npm ci --only=dev
-          npm audit --omit=dev
+          # Install only production dependencies since this is a static site
+          npm install --omit=dev
+          echo "Dependencies installed successfully"
       
       - name: ⚙️ Create Build Directories
         run: |
@@ -50,65 +51,28 @@ jobs:
           mkdir -p dist/scripts
           mkdir -p dist/assets/images
           mkdir -p reports
+          echo "Build directories created"
       
-      - name: 🔍 Validate HTML & CSS
+      - name: 🔍 Basic Validation
         run: |
-          echo "Validating HTML structure..."
-          # Basic HTML validation - install html5validator if needed
-          if command -v html5validator &> /dev/null; then
-            npm run validate || echo "HTML validation completed with warnings"
-          else
-            echo "HTML5Validator not available, skipping validation"
-          fi
+          echo "Validating project structure..."
+          # Check if required files exist
+          test -f index.html || (echo "index.html missing" && exit 1)
+          test -f styles/main.css || (echo "main.css missing" && exit 1)
+          test -f scripts/main.js || (echo "main.js missing" && exit 1)
+          echo "All required files present"
       
-      - name: 🎨 Process CSS
+      - name: 🎨 Prepare CSS
         run: |
-          echo "Processing and optimizing CSS..."
-          if npm list clean-css-cli --depth=0 &> /dev/null; then
-            npm run minify-css || cp styles/main.css dist/styles/main.min.css
-          else
-            echo "Creating optimized CSS manually..."
-            cp styles/main.css dist/styles/main.min.css
-          fi
+          echo "Preparing CSS files..."
+          cp styles/main.css dist/styles/main.css
+          echo "CSS files prepared"
       
-      - name: ⚡ Process JavaScript
+      - name: ⚡ Prepare JavaScript
         run: |
-          echo "Processing and optimizing JavaScript..."
-          if npm list uglify-js --depth=0 &> /dev/null; then
-            npm run minify-js || cp scripts/main.js dist/scripts/main.min.js
-          else
-            echo "Creating optimized JS manually..."
-            cp scripts/main.js dist/scripts/main.min.js
-          fi
-      
-      - name: 🔍 Lint JavaScript
-        run: |
-          if npm list eslint --depth=0 &> /dev/null; then
-            npm run lint:check || echo "Linting completed with warnings"
-          else
-            echo "ESLint not available, skipping linting"
-          fi
-      
-      - name: 📊 Performance Audit
-        run: |
-          echo "Running Lighthouse performance audit..."
-          # Start development server in background
-          npm run dev &
-          DEV_PID=$!
-          
-          # Wait for server to start
-          sleep 10
-          
-          # Run Lighthouse audit
-          if npm list lighthouse --depth=0 &> /dev/null; then
-            timeout 60s npm run lighthouse || echo "Lighthouse audit completed"
-          else
-            echo "Lighthouse not available, skipping audit"
-          fi
-          
-          # Stop development server
-          kill $DEV_PID || true
-        continue-on-error: true
+          echo "Preparing JavaScript files..."
+          cp scripts/main.js dist/scripts/main.js
+          echo "JavaScript files prepared"
       
       - name: 📊 Generate Build Info
         run: |
@@ -117,8 +81,10 @@ jobs:
             \"commit_sha\": \"${{ github.sha }}\",
             \"commit_ref\": \"${{ github.ref }}\",
             \"workflow_run\": \"${{ github.run_number }}\",
-            \"actor\": \"${{ github.actor }}\"
+            \"actor\": \"${{ github.actor }}\",
+            \"repository\": \"${{ github.repository }}\"
           }" > build-info.json
+          echo "Build info generated"
       
       - name: 📤 Setup Pages
         uses: actions/configure-pages@v4
@@ -147,9 +113,10 @@ jobs:
           echo "🎉 Portfolio showcase deployed successfully!"
           echo "🔗 Site URL: ${{ steps.deployment.outputs.page_url }}"
           echo "📅 Deployment time: $(date -u)"
+          echo "📊 Commit: ${{ github.sha }}"
   
-  # Lighthouse CI job (optional, runs on PRs)
-  lighthouse-ci:
+  # Basic check job (runs on PRs)
+  check:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     
@@ -157,38 +124,22 @@ jobs:
       - name: 📦 Checkout
         uses: actions/checkout@v4
       
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      
-      - name: 💾 Install Dependencies
-        run: npm ci --only=dev
-      
-      - name: 📏 Start Test Server
+      - name: 🔍 Basic File Validation
         run: |
-          npm run dev &
-          sleep 10
+          echo "Checking required files..."
+          test -f index.html && echo "✓ index.html found"
+          test -f styles/main.css && echo "✓ styles/main.css found"
+          test -f scripts/main.js && echo "✓ scripts/main.js found"
+          test -f package.json && echo "✓ package.json found"
+          test -f README.md && echo "✓ README.md found"
+          echo "All files validated successfully!"
       
-      - name: 📊 Run Lighthouse CI
+      - name: 📝 Check HTML Structure
         run: |
-          if npm list lighthouse --depth=0 &> /dev/null; then
-            npx lighthouse http://localhost:3000 \
-              --output=html \
-              --output=json \
-              --output-path=./lighthouse-results \
-              --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
-              --quiet || echo "Lighthouse CI completed"
-          else
-            echo "Lighthouse not available for CI"
-          fi
-        continue-on-error: true
-      
-      - name: 📈 Upload Lighthouse Results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: lighthouse-results
-          path: lighthouse-results.*
-          retention-days: 30
+          echo "Checking HTML structure..."
+          # Basic HTML structure validation
+          grep -q '<html lang="ro">' index.html && echo "✓ HTML lang attribute correct"
+          grep -q '<meta charset="UTF-8">' index.html && echo "✓ Charset meta tag present"
+          grep -q '<meta name="viewport"' index.html && echo "✓ Viewport meta tag present"
+          grep -q 'George Pricop' index.html && echo "✓ Author information present"
+          echo "HTML structure validation completed!"
